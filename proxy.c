@@ -68,11 +68,19 @@
 
 typedef enum {TRUE = 1, FALSE = 0} bool;
 
+typedef struct 
+{
+    int sock;
+    struct sockaddr_storage addr;
+}sockPara;
+
+
 int check_ipversion(char * address);
 int create_socket(int port);
 void sigchld_handler(int signal);
 void sigterm_handler(int signal);
 void server_loop();
+void *start_worker_t(void *args);
 void handle_client(int client_sock, struct sockaddr_storage client_addr);
 void forward_data(int source_sock, int destination_sock);
 void forward_data_ext(int source_sock, int destination_sock, char *cmd);
@@ -92,6 +100,7 @@ bool use_syslog = FALSE;
 int main(int argc, char *argv[]) {
     int local_port;
     pid_t pid;
+    int i;
 
     bind_addr = NULL;
 
@@ -116,16 +125,17 @@ int main(int argc, char *argv[]) {
     if (foreground) {
         server_loop();
     } else {
-        switch(pid = fork()) {
-            case 0: // deamonized child
+        for(i = 0; i < 4; i++){
+            pid = fork();
+            if(pid == 0){
                 server_loop();
                 break;
-            case -1: // error
+            } else if(pid == -1){
                 plog(LOG_CRIT, "Cannot daemonize: %m");
                 return pid;
-            default: // parent
-                close(server_sock);
+            }
         }
+        close(server_sock);
     }
 
     if (use_syslog)
@@ -207,7 +217,7 @@ int create_socket(int port) {
     /* prepare to bind on specified numeric address */
     if (bind_addr != NULL) {
         /* check for numeric IP to specify IPv6 or IPv4 socket */
-        if (validfamily = check_ipversion(bind_addr)) {
+        if ((validfamily = check_ipversion(bind_addr))) {
              hints.ai_family = validfamily;
              hints.ai_flags |= AI_NUMERICHOST; /* bind_addr is a valid numeric ip, skip resolve */
         }
@@ -440,7 +450,7 @@ int create_connection() {
     sprintf(portstr, "%d", remote_port);
 
     /* check for numeric IP to specify IPv6 or IPv4 socket */
-    if (validfamily = check_ipversion(remote_host)) {
+    if ((validfamily = check_ipversion(remote_host))) {
          hints.ai_family = validfamily;
          hints.ai_flags |= AI_NUMERICHOST;  /* remote_host is a valid numeric ip, skip resolve */
     }
@@ -465,3 +475,7 @@ int create_connection() {
     return sock;
 }
 /* vim: set et ts=4 sw=4: */
+
+void *start_worker_t(void *args){
+
+}
